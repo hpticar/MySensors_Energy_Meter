@@ -15,7 +15,6 @@
 #define SKETCH_NAME "Energy Meter SCT013"
 #define SKETCH_VERSION "1.0"
 
-//#include <SPI.h>
 #include <MySensors.h>  
 #include <EmonLib.h> 
  
@@ -24,23 +23,33 @@ EnergyMonitor emon1;
 
 MyMessage wattMsg(CHILD_ID,V_WATT);
 MyMessage kwhMsg(CHILD_ID,V_KWH);
-MyMessage msgKWH(CHILD_ID,V_VAR1);
-unsigned long SLEEP_TIME = 60000 - 3735; // sleep for 60 seconds (-4 seconds to calculate values)
 
-float wattsumme = 0;
-float kwh = 0;
-float wh = 0;
-int minuten = 0;  //vorher 61
+unsigned long SLEEP_TIME = 0; // sleep time until next second tick
+unsigned long time = 0;
+unsigned long currentTime = 0;
+
+long watt = 0;
+long wattAverage = 0;
+double wattTotal = 0;
+double kwh = 0;
+double wh = 0;
+int seconds = 0;
 boolean KWH_received=false;
 
 void setup() 
 {  
   Serial.begin(115200);
-  emon1.current(ANALOG_INPUT_SENSOR, 60.606);             // Current: input pin, calibration.
+  Serial.println("Start Energy Meter SCT013 v1.0");
+  
+  // Calibration factor = CT TURNS / burden resistance = 2000 / 33 Ohms = 60.606
+  // - or -
+  // Calibration factor = CT ratio / burden resistance = (100A / 0.05A) / 33 Ohms = 60.606
+  emon1.current(ANALOG_INPUT_SENSOR, 60.606);
 
   double Irms = emon1.calcIrms(1480);  // initial boot to charge up capacitor (no reading is taken) - testing
-  request(CHILD_ID,V_VAR1);
-  //end of energy clamp code
+  request(CHILD_ID,V_KWH);
+  wait(1000);
+  time = millis();
 }
 
 void presentation() 
@@ -51,44 +60,57 @@ void presentation()
 
 void loop()     
 { 
-  //KWH reveived check
-  if (!KWH_received) request(CHILD_ID,V_VAR1);
+  if (!KWH_received) request(CHILD_ID,V_KWH);
+
+  double Irms = emon1.calcIrms(1480);  // Calculate Irms only
+  if (Irms < 0.3) Irms = 0;
+  watt = Irms*240.0; // default was 230 but our local voltage is about 240
+  wattTotal += watt;
+  seconds++;
   
-  // power used each minute
-  if (minuten < 60) {
-    double Irms = emon1.calcIrms(1480);  // Calculate Irms only
-    if (Irms < 0.3) Irms = 0;
-    long watt = Irms*240.0; // default was 230 but our local voltage is about 240
-    wattsumme = wattsumme+watt;
-    minuten++;
-    send(wattMsg.set(watt, 3));  // Send watt value to gw
-    
-    Serial.print(watt);         // Apparent power
-    Serial.print("W I= ");
-    Serial.println(Irms);          // Irms   
+  if (seconds % 5 == 0) { // Send watt value every 5 sec
+    //send(wattMsg.set(watt, 0));  
+    send(wattMsg.set(wattTotal/seconds, 0)); // send average wattage instead of momentary
+    Serial.print("SND:W=");
+    Serial.println(wattTotal/seconds, 0);
   }
-  // end power used each minute
   
-  // hours KW reading
-  if (minuten >= 60) {
-    wh = wh + wattsumme/60;
+  if (seconds == 60){ // Send kWh every 60 seconds
+    wh += wattTotal/3600;
     kwh = wh/1000;
-    send(kwhMsg.set(kwh, 3)); // Send kwh value to gw 
-    send(msgKWH.set(kwh, 3)); // Send kwh value to gw
-    wattsumme = 0;
-    minuten = 0;
+    send(kwhMsg.set(kwh, 3));
+    Serial.print("SND:KWH=");
+    Serial.println(kwh, 3);
+    wattTotal = 0;
+    seconds = 0;
   }
 
- wait(SLEEP_TIME);
+  Serial.print((double)time/1000, 3);
+  Serial.print("\tW=");
+  Serial.print(watt);         // Apparent power
+  Serial.print("\tI=");
+  Serial.print(Irms);
+  Serial.print("\tT=");
+  Serial.println(SLEEP_TIME);
+
+  currentTime = millis();
+
+  if (currentTime > time) {
+    SLEEP_TIME = 1000 - (currentTime - time);
+  }
+  else { // when it loops over 4,294,967,295
+    SLEEP_TIME = 1000 - (4294967295 - time) + currentTime;
+  }
+  wait(SLEEP_TIME);
+  time = millis();
 }
 
 void receive(const MyMessage &message) {
-  if (message.type==V_VAR1) {  
+  if (message.type==V_KWH) {  
     kwh = message.getFloat();
     wh = kwh*1000;
-    Serial.print("Received last KWH from gw:");
+    Serial.print("RCV:KWH=");
     Serial.println(kwh);
-    //send(kwhMsg.set(kwh, 3)); // Send kwh value to gw 
     KWH_received = true;
   }
 }
