@@ -30,6 +30,7 @@ unsigned long time = 0;
 unsigned long currentTime = 0;
 
 long watt = 0;
+long wattReading = 0;
 long wattAverage = 0;
 double wattTotal = 0;
 double kwh = 0;
@@ -66,12 +67,16 @@ void loop()
   if (Irms < 0.3) Irms = 0;
   watt = Irms*240.0; // default was 230 but our local voltage is about 240
   wattTotal += watt;
+  wattReading += watt;
   seconds++;
   
   if (seconds % 5 == 0) { // Send watt value every 5 sec
     //send(wattMsg.set(watt, 0));  
-    send(wattMsg.set(wattTotal/seconds, 0)); // send average wattage instead of momentary, makes for a smoother curve
-    printf("SND:W=%.0f\n", wattTotal/seconds);
+    //send(wattMsg.set(wattTotal/seconds, 0)); // send average wattage instead of momentary, makes for a smoother curve
+    double wattSend = wattReading/5;
+    send(wattMsg.set(wattSend, 0));
+    printf("SND:W=%.0f\n", wattSend);
+    wattReading = 0;
   }
   
   if (seconds == 60){ // Send kWh every 60 seconds
