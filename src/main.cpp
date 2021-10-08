@@ -15,8 +15,9 @@
 #define SKETCH_NAME "Energy Meter SCT013"
 #define SKETCH_VERSION "1.0"
 
-#include <MySensors.h>  
-#include <EmonLib.h> 
+#include <MySensors.h>
+#include <EmonLib.h>
+#include <LibPrintf.h>
  
 #define ANALOG_INPUT_SENSOR 1
 EnergyMonitor emon1;
@@ -39,8 +40,7 @@ boolean KWH_received=false;
 void setup() 
 {  
   Serial.begin(115200);
-  Serial.println("Start Energy Meter SCT013 v1.0");
-  
+  printf("Start Energy Meter SCT013 v1.0\n");
   // Calibration factor = CT TURNS / burden resistance = 2000 / 33 Ohms = 60.606
   // - or -
   // Calibration factor = CT ratio / burden resistance = (100A / 0.05A) / 33 Ohms = 60.606
@@ -70,28 +70,20 @@ void loop()
   
   if (seconds % 5 == 0) { // Send watt value every 5 sec
     //send(wattMsg.set(watt, 0));  
-    send(wattMsg.set(wattTotal/seconds, 0)); // send average wattage instead of momentary
-    Serial.print("SND:W=");
-    Serial.println(wattTotal/seconds, 0);
+    send(wattMsg.set(wattTotal/seconds, 0)); // send average wattage instead of momentary, makes for a smoother curve
+    printf("SND:W=%.0f\n", wattTotal/seconds);
   }
   
   if (seconds == 60){ // Send kWh every 60 seconds
     wh += wattTotal/3600;
     kwh = wh/1000;
     send(kwhMsg.set(kwh, 3));
-    Serial.print("SND:KWH=");
-    Serial.println(kwh, 3);
+    printf("SND:KWH=%.3f\n", kwh);
     wattTotal = 0;
     seconds = 0;
   }
 
-  Serial.print((double)time/1000, 3);
-  Serial.print("\tW=");
-  Serial.print(watt);         // Apparent power
-  Serial.print("\tI=");
-  Serial.print(Irms);
-  Serial.print("\tT=");
-  Serial.println(SLEEP_TIME);
+  printf("%.3f\tW=%ld\tI=%.2f\tT=%lu\n", (double)time/1000, watt, Irms, SLEEP_TIME);
 
   currentTime = millis();
 
@@ -109,8 +101,7 @@ void receive(const MyMessage &message) {
   if (message.type==V_KWH) {  
     kwh = message.getFloat();
     wh = kwh*1000;
-    Serial.print("RCV:KWH=");
-    Serial.println(kwh);
+    printf("RCV:KWH=%.3f\n", kwh);
     KWH_received = true;
   }
 }
