@@ -32,6 +32,7 @@ unsigned long currentTime = 0;
 long watt = 0;
 long wattReading = 0;
 long wattAverage = 0;
+double Irms = 0;
 double wattTotal = 0;
 double kwh = 0;
 double wh = 0;
@@ -47,7 +48,7 @@ void setup()
   // Calibration factor = CT ratio / burden resistance = (100A / 0.05A) / 33 Ohms = 60.606
   emon1.current(ANALOG_INPUT_SENSOR, 60.606);
 
-  double Irms = emon1.calcIrms(1480);  // initial boot to charge up capacitor (no reading is taken) - testing
+  Irms = emon1.calcIrms(1480);  // initial boot to charge up capacitor (no reading is taken) - testing
   request(CHILD_ID,V_KWH);
   wait(1000);
   time = millis();
@@ -63,7 +64,7 @@ void loop()
 { 
   if (!KWH_received) request(CHILD_ID,V_KWH);
 
-  double Irms = emon1.calcIrms(1480);  // Calculate Irms only
+  Irms = emon1.calcIrms(1480);  // Calculate Irms only
   if (Irms < 0.3) Irms = 0;
   watt = Irms*240.0; // default was 230 but our local voltage is about 240
   wattTotal += watt;
@@ -88,7 +89,7 @@ void loop()
     seconds = 0;
   }
 
-  printf("%.3f\tW=%ld\tI=%.2f\tT=%lu\n", (double)time/1000, watt, Irms, SLEEP_TIME);
+  printf("%lu\tW=%ld\tI=%.2f\tT=%lu\n", time, watt, Irms, SLEEP_TIME);
 
   currentTime = millis();
 
