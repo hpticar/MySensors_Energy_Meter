@@ -37,7 +37,7 @@ double wattTotal = 0;
 double kwh = 0;
 double wh = 0;
 int seconds = 0;
-boolean KWH_received=false;
+bool KWH_received=false;
 
 void setup() 
 {  
@@ -66,14 +66,12 @@ void loop()
 
   Irms = emon1.calcIrms(1480);  // Calculate Irms only
   if (Irms < 0.3) Irms = 0;
-  watt = Irms*240.0; // default was 230 but our local voltage is about 240
+  watt = Irms*230.0;
   wattTotal += watt;
   wattReading += watt;
   seconds++;
   
   if (seconds % 5 == 0) { // Send watt value every 5 sec
-    //send(wattMsg.set(watt, 0));  
-    //send(wattMsg.set(wattTotal/seconds, 0)); // send average wattage instead of momentary, makes for a smoother curve
     double wattSend = wattReading/5;
     send(wattMsg.set(wattSend, 0));
     printf("SND:W=%.0f\n", wattSend);
@@ -83,6 +81,7 @@ void loop()
   if (seconds == 60){ // Send kWh every 60 seconds
     wh += wattTotal/3600;
     kwh = wh/1000;
+    //kwh = 31719.5;
     send(kwhMsg.set(kwh, 3));
     printf("SND:KWH=%.3f\n", kwh);
     wattTotal = 0;
